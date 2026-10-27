@@ -1,0 +1,54 @@
+<!-- ==========================================================================
+     AI CRATE BROWSER & AUTONOMOUS AGENT CONSOLE
+     ========================================================================== -->
+<div id="ai-agent-hud" style="
+  width: 1420px; max-width: 99vw; background: #0b0c10; border: 1px solid #1f232d;
+  border-top: none; padding: 12px 18px; display: flex; flex-direction: column;
+  gap: 10px; font-family: monospace; font-size: 11px; color: #a0a6b5;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8); margin-bottom: 8px;">
+
+  <!-- TOP BAR: ENGINE STATE & FOLDER INPUT -->
+  <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1c202a; padding-bottom: 10px;">
+    <div style="display:flex; align-items:center; gap: 12px;">
+      <button id="ai-agent-toggle" style="
+        background: #11281c; border: 1px solid #00e676; color: #00e676;
+        font-weight: 800; padding: 7px 16px; border-radius: 4px; cursor: pointer;
+        letter-spacing: 1px;">
+        ▶ ENGAGE AI AUTONOMOUS CRATE MIXER
+      </button>
+
+      <label class="btn-small" style="background:#222530; border:1px solid #3d4253; color:#fff; cursor:pointer; padding:7px 14px;">
+        📁 OPEN FOLDER / CRATE
+        <input type="file" id="ai-folder-input" webkitdirectory directory multiple style="display:none;">
+      </label>
+
+      <span id="ai-agent-status" style="color: #60687a;">STATUS: STANDBY (LOAD A FOLDER TO BEGIN)</span>
+    </div>
+
+    <!-- SELECTION STRATEGY SELECTOR -->
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-weight: 700; color: #788094;">SELECTION LOGIC:</span>
+      <select id="ai-selection-strategy" style="background:#151821; border:1px solid #2d3345; color:#00f0ff; font-weight:700; padding:4px 8px; border-radius:3px;">
+        <option value="harmonic">SMART BPM / HARMONIC PROXIMITY</option>
+        <option value="energy_build">ENERGY ASCENSION (UP-TEMPO BUILD)</option>
+        <option value="shuffle">RANDOM CRATE DIGGING</option>
+        <option value="sequential">STRICT TRACKLIST ORDER</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR: TELEMETRY & LIVE CRATE LIST -->
+  <div style="display: grid; grid-template-columns: 320px 1fr; gap: 15px; align-items: center;">
+    <div id="ai-telemetry" style="display:flex; flex-direction:column; gap:4px; border-right: 1px solid #1c202a; padding-right: 12px;">
+      <div>PHRASE POSITION: <b id="ai-phrase-counter" style="color:#fff;">0 / 32</b></div>
+      <div>MASTER DECK: <b id="ai-lead-deck" style="color:var(--accent-cyan);">CH 1</b></div>
+      <div>CURRENT ACTION: <b id="ai-next-action" style="color:var(--accent-orange);">WAITING FOR CRATE</b></div>
+      <div>CRATE STATUS: <b id="ai-crate-stats" style="color:var(--accent-green);">0 Tracks Loaded</b></div>
+    </div>
+
+    <!-- MINI SCROLLING CRATE TRACK VIEW -->
+    <div style="overflow-x: auto; white-space: nowrap; padding: 4px; background: #060709; border-radius: 4px; border: 1px solid #161820; height: 42px; display: flex; align-items: center; gap: 8px;" id="ai-crate-strip">
+      <span style="color:#4a5060; font-style:italic;">[Empty Crate — Open a local music folder above]</span>
+    </div>
+  </div>
+</div>
