@@ -6,6 +6,9 @@ nickpelectrical is not this project. Do not use that account, do not add it as a
 
 Read `AGENTS.md` before changing anything.
 
+The public product is an app: anyone can put their own songs on the decks and get AI help, in their own session. Nick's live set is separate. Strangers hear it and see the avatar. They cannot drive those decks.
+
+
 Placeholder landing page for siagentdj.com.
 
 **Domain:** [siagentdj.com](https://siagentdj.com) (also reachable at https://percfectai.github.io/siagentdj-site/ until DNS points at GitHub Pages)
