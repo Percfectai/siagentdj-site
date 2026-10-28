@@ -1,5 +1,11 @@
 # siagentdj-site
 
+**Org is Percfectai. Repo is Percfectai/siagentdj-site. Domain is siagentdj.com.**
+
+nickpelectrical is not this project. Do not use that account, do not add it as a collaborator, and do not push to a nickpelectrical repo. The old percfectstudios tree is not this site.
+
+Read `AGENTS.md` before changing anything.
+
 Placeholder landing page for siagentdj.com.
 
 **Domain:** [siagentdj.com](https://siagentdj.com) (also reachable at https://percfectai.github.io/siagentdj-site/ until DNS points at GitHub Pages)
