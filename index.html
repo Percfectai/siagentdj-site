@@ -697,6 +697,7 @@
       <canvas id="d2-waveform" class="waveform-canvas"></canvas>
     </div>
   </div>
+  <div id="track-floor" style="width:1420px;max-width:99vw;display:flex;gap:8px;padding:8px 12px;background:#101114;border:1px solid #272a33;border-top:none;"></div>
 
   <!-- MAIN HARDWARE CONSOLE -->
   <div class="dj-console">
@@ -1870,6 +1871,42 @@
     /* ==========================================================================
        KEYBOARD HOTKEYS (Pro DJ Fast Mapping)
        ========================================================================== */
+    const FLOOR = [
+      { title: "Perfect AI Pop", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/perfect_ai_pop.mp3" },
+      { title: "Perfect AI Pop 2", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/perfect_ai_pop_2.mp3" },
+      { title: "Perfect AI Hero Cards", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/perfect_ai_hero_cards.mp3" },
+      { title: "Grizzly Reapers Tunnel", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/grizzly_reapers_tunnel.mp3" }
+    ];
+    const floorEl = document.getElementById("track-floor");
+    let nextDeck = 1;
+    function loadUrlOnto(deck, track) {
+      return fetch(track.url).then((res) => {
+        if (!res.ok) throw new Error(track.title);
+        return res.arrayBuffer();
+      }).then((buf) => {
+        const file = new File([buf], track.title + ".mp3", { type: "audio/mpeg" });
+        deck.loadAudioBuffer(file);
+      });
+    }
+    FLOOR.forEach((track, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = track.title;
+      btn.style.cssText = "background:#1a1b22;color:#e6e9f0;border:1px solid #3b3f4d;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;";
+      btn.addEventListener("click", () => {
+        const deck = nextDeck === 1 ? deck1 : deck2;
+        nextDeck = nextDeck === 1 ? 2 : 1;
+        document.getElementById("ai-mix-status").textContent = "Loading " + track.title + " onto Player " + deck.id + ".";
+        loadUrlOnto(deck, track).catch(() => {
+          document.getElementById("ai-mix-status").textContent = "Could not load " + track.title + ".";
+        });
+      });
+      floorEl.appendChild(btn);
+      if (i === 0) loadUrlOnto(deck1, track);
+      if (i === 1) loadUrlOnto(deck2, track);
+    });
+    document.getElementById("ai-mix-status").textContent = "Loading the four tracks from Supabase. Player 1 and Player 2 get the first two.";
+
     document.getElementById("ai-mix-btn").addEventListener("click", () => {
       const status = document.getElementById("ai-mix-status");
       if (!deck1.audio || !deck2.audio) {
