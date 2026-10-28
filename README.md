@@ -6,9 +6,7 @@ nickpelectrical is not this project. Do not use that account, do not add it as a
 
 Read `AGENTS.md` before changing anything.
 
-The public product is an app: anyone can put their own songs on the decks and get AI help, in their own session. Nick's live set is separate. Strangers hear it and see the avatar. They cannot drive those decks.
-
-AI help on the decks is paid with Percfect credits. Opening the decks and loading your own songs is free. Do not add a second payment system.
+The advertisement is Nick's decks playing Nick's tracks. The software is that same two-deck mixer with the AI built in. Anyone can use it with their own tracks, Nick's tracks, or both. A visitor cannot move the faders on the live advertisement. AI actions spend Percfect credits. Loading tracks is free. Do not add a second payment system.
 
 
 
