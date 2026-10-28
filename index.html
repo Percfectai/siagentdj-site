@@ -671,6 +671,18 @@
       font-size: 9px;
       color: var(--text-dim);
     }
+    body.spectator .dj-console,
+    body.spectator .waveforms-container,
+    body.spectator #track-floor { pointer-events: none; }
+    body.spectator #ai-mix-btn,
+    body.spectator #master-rec-btn,
+    body.spectator #ai-switch-wrap { display: none; }
+    #setlist { width: 1420px; max-width: 99vw; display: flex; justify-content: space-between; gap: 16px; padding: 10px 14px; background: #0c0d11; border: 1px solid #272a33; border-top: none; }
+    #setlist ol { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.7; }
+    #setlist li.on { color: var(--accent-cyan); font-weight: 800; }
+    #setlist li.next { color: var(--accent-orange); }
+    #pay-note { font-size: 12px; color: var(--text-dim); max-width: 460px; }
+    #get-app { background: var(--accent-cyan); color: #041014; border: none; font-weight: 800; font-size: 11px; letter-spacing: 0.5px; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -679,8 +691,11 @@
   <div class="top-bar">
     <div class="brand-logo">Pioneer DJ <span>●</span> PRO SYSTEM</div>
     <div class="global-controls">
+      <label id="ai-switch-wrap" style="display:none;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent-cyan);align-items:center;gap:6px;">
+        <input type="checkbox" id="ai-takeover"> AI TAKEOVER
+      </label>
       <button class="rec-btn" id="ai-mix-btn" type="button" style="border-color:var(--accent-cyan);color:var(--accent-cyan);background:#102226;">AI MIX</button>
-      <span id="ai-mix-status" style="font-size:11px;color:var(--text-dim);max-width:420px;">Load a track on each deck. Your songs, the ad tracks, or both. AI MIX plays them together.</span>
+      <span id="ai-mix-status" style="font-size:11px;color:var(--text-dim);max-width:420px;">Live set. The AI is running it.</span>
       <button class="rec-btn" id="master-rec-btn">● MASTER REC <span id="rec-timer">00:00</span></button>
       <a id="rec-download" style="display:none; font-size:11px; color:var(--accent-cyan);" download="Live_DJ_Mix.webm">💾 Save Mix</a>
     </div>
@@ -695,6 +710,16 @@
     </div>
     <div class="waveform-lane">
       <canvas id="d2-waveform" class="waveform-canvas"></canvas>
+    </div>
+  </div>
+  <div id="setlist">
+    <div>
+      <div style="font-size:10px;letter-spacing:2px;color:#767c8a;font-weight:800;">LIVE SETLIST</div>
+      <ol id="setlist-items"></ol>
+    </div>
+    <div id="pay-note">
+      This set is the example. You can watch it. You cannot move it.
+      <div style="margin-top:8px;"><button id="get-app" type="button">GET THE MIXER</button></div>
     </div>
   </div>
   <div id="track-floor" style="width:1420px;max-width:99vw;display:flex;gap:8px;padding:8px 12px;background:#101114;border:1px solid #272a33;border-top:none;"></div>
@@ -1882,9 +1907,35 @@
       { title: "Perfect AI Hero Cards", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/perfect_ai_hero_cards.mp3" },
       { title: "Grizzly Reapers Tunnel", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/grizzly_reapers_tunnel.mp3" }
     ];
+    const STUDIO = new URLSearchParams(location.search).get("program") === "1";
+    document.body.classList.toggle("spectator", !STUDIO);
     const floorEl = document.getElementById("track-floor");
     const status = document.getElementById("ai-mix-status");
-    let aiOn = true;
+    const setlistEl = document.getElementById("setlist-items");
+    let aiOn = !STUDIO;
+    function paintSetlist() {
+      setlistEl.innerHTML = "";
+      FLOOR.forEach((track, i) => {
+        const li = document.createElement("li");
+        li.textContent = track.title;
+        if (i === masterIndex) li.className = "on";
+        else if (i === incomingIndex) li.className = "next";
+        setlistEl.appendChild(li);
+      });
+    }
+    document.getElementById("get-app").addEventListener("click", () => {
+      status.textContent = "The mixer is the paid program: two decks, your music, and a switch that lets the AI take over. Checkout is not open on this page yet.";
+    });
+    if (STUDIO) {
+      document.getElementById("pay-note").textContent = "Your mixer. You run the decks. Flip AI takeover and the AI runs the mix.";
+      const wrap = document.getElementById("ai-switch-wrap");
+      wrap.style.display = "flex";
+      document.getElementById("ai-takeover").addEventListener("change", (e) => {
+        aiOn = e.target.checked;
+        if (aiOn) startLiveExample();
+        else status.textContent = "You have the decks. Flip AI takeover when you want the AI to run the mix.";
+      });
+    }
     let master = deck1;
     let incoming = deck2;
     let masterIndex = 0;
@@ -1962,7 +2013,8 @@
         incoming.play();
         fadeStart = performance.now();
         phase = "blend";
-        status.textContent = "Live example. Bringing in " + FLOOR[incomingIndex].title + ".";
+        status.textContent = "Live set. Bringing in " + FLOOR[incomingIndex].title + ".";
+        paintSetlist();
       } else if (phase === "blend") {
         const p = Math.min(1, (performance.now() - fadeStart) / 20000);
         const xf = document.getElementById("crossfader");
@@ -1979,7 +2031,8 @@
           masterIndex = incomingIndex;
           incomingIndex = (incomingIndex + 1) % FLOOR.length;
           phase = "reload";
-          status.textContent = "Live example. On " + FLOOR[masterIndex].title + ".";
+          status.textContent = "Live set. On " + FLOOR[masterIndex].title + ".";
+          paintSetlist();
           loadUrlOnto(incoming, FLOOR[incomingIndex]).then(() => {
             if (!aiOn) return;
             setLow(incoming, true);
@@ -2012,7 +2065,10 @@
       deck1.seekTo(0);
       deck1.play();
       phase = "playing";
-      status.textContent = "Live example. AI DJ is on " + FLOOR[0].title + ". Load any track to try it with your own music.";
+      paintSetlist();
+      status.textContent = STUDIO
+        ? "AI takeover is on. Flip the switch off to run the decks yourself."
+        : "Live set. The AI is running it. You can watch. You cannot touch the decks.";
     }
 
     document.getElementById("ai-mix-btn").addEventListener("click", () => {
@@ -2020,12 +2076,21 @@
         status.textContent = "The live example could not start. Tap AI MIX again.";
       });
     });
-    startLiveExample().catch(() => {
-      status.textContent = "Tap AI MIX to hear the live example.";
-    });
+    if (!STUDIO) {
+      startLiveExample().catch(() => {
+        status.textContent = "Tap anywhere on the setlist to hear the live set.";
+      });
+      document.getElementById("setlist").addEventListener("click", () => {
+        if (!aiOn) return;
+        startLiveExample();
+      });
+    } else {
+      status.textContent = "Your mixer. Load your tracks, or the four on the floor. Flip AI takeover to let the AI run it.";
+    }
     requestAnimationFrame(aiTick);
 
     window.addEventListener("keydown", (e) => {
+      if (!STUDIO) return;
       if (e.target.tagName === 'INPUT') return;
       if (e.code === "Space") { e.preventDefault(); deck1.dom.playBtn.click(); }
       if (e.code === "KeyD") deck2.dom.playBtn.click();
