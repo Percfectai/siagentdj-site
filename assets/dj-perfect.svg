@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" width="400" height="520" role="img" aria-label="DJ Perfect, original cartoon placeholder">
+  <!-- Original stylized cartoon placeholder for "DJ Perfect". Not a likeness of any real person.
+       Swap: replace this file (or set avatarSrc in config.js) with the official artwork. Keep id="head" if you want the head-only nod. -->
+  <defs>
+    <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d2b48c"/><stop offset="1" stop-color="#a8865a"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff2a8"/><stop offset=".5" stop-color="#f2c230"/><stop offset="1" stop-color="#b8860b"/></linearGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9bf93"/><stop offset="1" stop-color="#b8996a"/></linearGradient>
+    <linearGradient id="lap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfd3da"/><stop offset="1" stop-color="#8d939c"/></linearGradient>
+  </defs>
+  <g id="body">
+    <!-- torso / overcoat -->
+    <path d="M95 300 Q100 250 160 238 L240 238 Q300 250 305 300 L320 470 L80 470 Z" fill="url(#coat)" stroke="#6e5434" stroke-width="3"/>
+    <!-- shirt + lapels -->
+    <path d="M170 240 L200 330 L230 240 Z" fill="#2a2140"/>
+    <path d="M160 240 L200 335 L175 300 L150 255 Z" fill="#b8996a" stroke="#6e5434" stroke-width="2"/>
+    <path d="M240 240 L200 335 L225 300 L250 255 Z" fill="#b8996a" stroke="#6e5434" stroke-width="2"/>
+    <!-- coat buttons -->
+    <circle cx="200" cy="370" r="5" fill="#5a4326"/><circle cx="200" cy="405" r="5" fill="#5a4326"/>
+    <!-- left arm resting -->
+    <path d="M100 300 Q78 360 92 440 L122 440 Q118 370 130 320 Z" fill="url(#coat)" stroke="#6e5434" stroke-width="3"/>
+    <!-- right arm pointing at the viewer (foreshortened) -->
+    <g id="point-arm">
+      <path d="M290 290 Q330 300 336 340 Q330 360 300 352 Q290 330 270 320 Z" fill="url(#coat)" stroke="#6e5434" stroke-width="3"/>
+      <path d="M316 336 Q318 322 334 322 Q352 322 354 338 Q354 360 334 364 Q316 362 316 336 Z" fill="#8a5a3c" stroke="#4f3322" stroke-width="3"/>
+      <path d="M322 346 Q334 352 346 346" fill="none" stroke="#4f3322" stroke-width="2"/>
+      <ellipse cx="340" cy="331" rx="13" ry="12" fill="#9c6a48" stroke="#4f3322" stroke-width="3"/>
+      <ellipse cx="341" cy="330" rx="6" ry="5" fill="#6b4630"/>
+      <path d="M334 324 Q340 322 346 326" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>
+    </g>
+    <!-- headphones around the neck -->
+    <path d="M150 246 Q200 285 250 246" fill="none" stroke="#1c1c24" stroke-width="9" stroke-linecap="round"/>
+    <rect x="132" y="232" width="26" height="34" rx="9" fill="#1c1c24" stroke="#00f0ff" stroke-width="2"/>
+    <rect x="242" y="232" width="26" height="34" rx="9" fill="#1c1c24" stroke="#00f0ff" stroke-width="2"/>
+    <!-- gold chain + BS pendant -->
+    <path d="M165 250 Q200 320 235 250" fill="none" stroke="url(#gold)" stroke-width="6" stroke-dasharray="7 3"/>
+    <rect x="176" y="298" width="48" height="34" rx="7" fill="url(#gold)" stroke="#8a6508" stroke-width="2"/>
+    <text x="200" y="323" text-anchor="middle" font-family="Georgia, serif" font-weight="900" font-size="22" fill="#5a3f00">BS</text>
+  </g>
+  <g id="head">
+    <!-- neck -->
+    <rect x="182" y="205" width="36" height="36" fill="#7a4e33"/>
+    <!-- head (simple cartoon) -->
+    <ellipse cx="200" cy="165" rx="58" ry="64" fill="#8a5a3c" stroke="#4f3322" stroke-width="3"/>
+    <ellipse cx="143" cy="170" rx="9" ry="14" fill="#7a4e33" stroke="#4f3322" stroke-width="2"/>
+    <ellipse cx="257" cy="170" rx="9" ry="14" fill="#7a4e33" stroke="#4f3322" stroke-width="2"/>
+    <!-- shades -->
+    <rect x="160" y="150" width="34" height="20" rx="6" fill="#151520"/>
+    <rect x="206" y="150" width="34" height="20" rx="6" fill="#151520"/>
+    <path d="M194 158 L206 158" stroke="#151520" stroke-width="4"/>
+    <path d="M166 154 L178 154" stroke="#7d5cff" stroke-width="3" stroke-linecap="round"/>
+    <path d="M212 154 L224 154" stroke="#7d5cff" stroke-width="3" stroke-linecap="round"/>
+    <!-- nose + grin -->
+    <path d="M200 172 Q194 188 202 190" fill="none" stroke="#4f3322" stroke-width="3" stroke-linecap="round"/>
+    <path d="M176 200 Q200 220 224 200 Q200 208 176 200 Z" fill="#fff" stroke="#4f3322" stroke-width="3"/>
+    <!-- fedora -->
+    <ellipse cx="200" cy="118" rx="98" ry="18" fill="url(#hat)" stroke="#6e5434" stroke-width="3"/>
+    <path d="M140 116 Q138 60 170 52 Q200 66 230 52 Q262 60 260 116 Z" fill="url(#hat)" stroke="#6e5434" stroke-width="3"/>
+    <path d="M141 100 L259 100 L260 116 L140 116 Z" fill="#5a4326"/>
+  </g>
+  <g id="laptop">
+    <path d="M110 470 L130 395 L290 395 L310 470 Z" fill="url(#lap)" stroke="#5c626b" stroke-width="3"/>
+    <rect x="60" y="468" width="280" height="14" rx="5" fill="#9aa0a8" stroke="#5c626b" stroke-width="2" transform="translate(0 0)"/>
+    <rect x="148" y="412" width="124" height="38" rx="8" fill="#14161d" stroke="#7d5cff" stroke-width="2"/>
+    <text x="210" y="430" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="12" fill="#f2c230">DJ biggAi</text>
+    <text x="210" y="445" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="12" fill="#00f0ff">Smalls</text>
+  </g>
+</svg>
