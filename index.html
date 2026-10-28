@@ -1248,7 +1248,12 @@
 
         // File loader
         document.getElementById(`d${id}-file`).addEventListener("change", (e) => {
-          if (e.target.files.length) this.loadAudioBuffer(e.target.files[0]);
+          if (e.target.files.length) {
+            if (typeof aiOn !== "undefined") aiOn = false;
+            const status = document.getElementById("ai-mix-status");
+            if (status) status.textContent = "Your track is on Player " + this.id + ". The live example is paused.";
+            this.loadAudioBuffer(e.target.files[0]);
+          }
         });
 
         // Transport
@@ -1878,7 +1883,15 @@
       { title: "Grizzly Reapers Tunnel", url: "https://fyxofxprzffcdgbkdyax.supabase.co/storage/v1/object/public/dj-tracks/grizzly_reapers_tunnel.mp3" }
     ];
     const floorEl = document.getElementById("track-floor");
-    let nextDeck = 1;
+    const status = document.getElementById("ai-mix-status");
+    let aiOn = true;
+    let master = deck1;
+    let incoming = deck2;
+    let masterIndex = 0;
+    let incomingIndex = 1;
+    let phase = "boot";
+    let fadeStart = 0;
+
     function loadUrlOnto(deck, track) {
       return fetch(track.url).then((res) => {
         if (!res.ok) throw new Error(track.title);
@@ -1886,58 +1899,131 @@
       }).then((buf) => {
         const file = new File([buf], track.title + ".mp3", { type: "audio/mpeg" });
         deck.loadAudioBuffer(file);
+        return new Promise((resolve) => {
+          const timer = setInterval(() => {
+            if (deck.buffer && deck.dom.title.textContent === track.title) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, 200);
+        });
       });
     }
-    FLOOR.forEach((track, i) => {
+    function setLow(deck, killed) {
+      if (deck.lowFilter) deck.lowFilter.gain.value = killed ? -100 : 0;
+      const btn = document.querySelector('.eq-kill-btn[data-ch="' + deck.id + '"][data-eq="low"]');
+      if (btn) btn.classList.toggle("killed", killed);
+    }
+    function arm(deck) {
+      deck.dom.volFader.value = "0.9";
+      if (deck.deckGain) deck.deckGain.gain.value = 0.9;
+      if (deck.crossGain) deck.crossGain.gain.value = 1;
+    }
+    function matchTempo(from, to) {
+      const a = from.detectedBpm || 0;
+      const b = to.detectedBpm || 0;
+      if (a < 40 || b < 40) return;
+      const rate = Math.max(0.5, Math.min(1.5, a / b));
+      to.playbackRate = rate;
+      to.dom.pitch.value = String(rate);
+      if (to.audio) to.audio.playbackRate = rate;
+    }
+    function parkFader() {
+      const xf = document.getElementById("crossfader");
+      xf.value = master === deck1 ? "0" : "1";
+      xf.dispatchEvent(new Event("input"));
+    }
+
+    FLOOR.forEach((track) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = track.title;
       btn.style.cssText = "background:#1a1b22;color:#e6e9f0;border:1px solid #3b3f4d;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;";
       btn.addEventListener("click", () => {
-        const deck = nextDeck === 1 ? deck1 : deck2;
-        nextDeck = nextDeck === 1 ? 2 : 1;
-        document.getElementById("ai-mix-status").textContent = "Loading " + track.title + " onto Player " + deck.id + ".";
-        loadUrlOnto(deck, track).catch(() => {
-          document.getElementById("ai-mix-status").textContent = "Could not load " + track.title + ".";
-        });
+        aiOn = false;
+        status.textContent = "Your track. The live example is paused. Press AI MIX to put the example back on.";
+        const deck = master && master.isPlaying ? incoming : deck1;
+        loadUrlOnto(deck, track);
       });
       floorEl.appendChild(btn);
-      if (i === 0) loadUrlOnto(deck1, track);
-      if (i === 1) loadUrlOnto(deck2, track);
     });
-    document.getElementById("ai-mix-status").textContent = "Loading the four tracks from Supabase. Player 1 and Player 2 get the first two.";
+
+    function aiTick() {
+      if (!aiOn) return;
+      const left = master.audio && master.audio.duration
+        ? master.audio.duration - master.audio.currentTime
+        : 999;
+      if (phase === "playing" && left < 40 && incoming.buffer) {
+        matchTempo(master, incoming);
+        setLow(incoming, true);
+        setLow(master, false);
+        arm(incoming);
+        incoming.seekTo(0);
+        incoming.play();
+        fadeStart = performance.now();
+        phase = "blend";
+        status.textContent = "Live example. Bringing in " + FLOOR[incomingIndex].title + ".";
+      } else if (phase === "blend") {
+        const p = Math.min(1, (performance.now() - fadeStart) / 20000);
+        const xf = document.getElementById("crossfader");
+        const from = master === deck1 ? 0 : 1;
+        const to = master === deck1 ? 1 : 0;
+        xf.value = String(from + (to - from) * p);
+        xf.dispatchEvent(new Event("input"));
+        if (p >= 1) {
+          setLow(master, true);
+          setLow(incoming, false);
+          const old = master;
+          master = incoming;
+          incoming = old;
+          masterIndex = incomingIndex;
+          incomingIndex = (incomingIndex + 1) % FLOOR.length;
+          phase = "reload";
+          status.textContent = "Live example. On " + FLOOR[masterIndex].title + ".";
+          loadUrlOnto(incoming, FLOOR[incomingIndex]).then(() => {
+            if (!aiOn) return;
+            setLow(incoming, true);
+            incoming.pause();
+            incoming.seekTo(0);
+            phase = "playing";
+          });
+        }
+      }
+      requestAnimationFrame(aiTick);
+    }
+
+    async function startLiveExample() {
+      const ctx = getAudioCtx();
+      if (ctx.state === "suspended") await ctx.resume();
+      aiOn = true;
+      status.textContent = "Live example. Loading the four tracks.";
+      await loadUrlOnto(deck1, FLOOR[0]);
+      await loadUrlOnto(deck2, FLOOR[1]);
+      master = deck1;
+      incoming = deck2;
+      masterIndex = 0;
+      incomingIndex = 1;
+      arm(deck1);
+      arm(deck2);
+      setLow(deck1, false);
+      setLow(deck2, true);
+      parkFader();
+      deck2.pause();
+      deck1.seekTo(0);
+      deck1.play();
+      phase = "playing";
+      status.textContent = "Live example. AI DJ is on " + FLOOR[0].title + ". Load any track to try it with your own music.";
+    }
 
     document.getElementById("ai-mix-btn").addEventListener("click", () => {
-      const status = document.getElementById("ai-mix-status");
-      if (!deck1.audio || !deck2.audio) {
-        status.textContent = "Load a track on Player 1 and Player 2 first.";
-        return;
-      }
-      getAudioCtx().resume();
-      document.getElementById("d2-sync").click();
-      ["d1-vol", "d2-vol"].forEach((id) => {
-        const fader = document.getElementById(id);
-        if (parseFloat(fader.value) < 0.5) fader.value = "0.9";
-        fader.dispatchEvent(new Event("input"));
+      startLiveExample().catch(() => {
+        status.textContent = "The live example could not start. Tap AI MIX again.";
       });
-      const xf = document.getElementById("crossfader");
-      xf.value = "0.5";
-      xf.dispatchEvent(new Event("input"));
-      deck1.crossGain.gain.value = 1;
-      deck2.crossGain.gain.value = 1;
-      const low2 = document.querySelector('.eq-kill-btn[data-ch="2"][data-eq="low"]');
-      if (low2 && !low2.classList.contains("killed")) low2.click();
-      if (!deck1.isPlaying) deck1.play();
-      if (!deck2.isPlaying) deck2.play();
-      const bpm = parseFloat(document.getElementById("d1-bpm").textContent) || 128;
-      status.textContent = "Both decks live. Player 2 bass is out until the next 32 beats.";
-      setTimeout(() => {
-        const low1 = document.querySelector('.eq-kill-btn[data-ch="1"][data-eq="low"]');
-        if (low1 && !low1.classList.contains("killed")) low1.click();
-        if (low2 && low2.classList.contains("killed")) low2.click();
-        status.textContent = "Phrase swap. Player 1 bass out, Player 2 bass in. Both still playing.";
-      }, (60 / bpm) * 32 * 1000);
     });
+    startLiveExample().catch(() => {
+      status.textContent = "Tap AI MIX to hear the live example.";
+    });
+    requestAnimationFrame(aiTick);
 
     window.addEventListener("keydown", (e) => {
       if (e.target.tagName === 'INPUT') return;
