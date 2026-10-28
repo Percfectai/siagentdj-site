@@ -8,6 +8,9 @@ Read `AGENTS.md` before changing anything.
 
 The public product is an app: anyone can put their own songs on the decks and get AI help, in their own session. Nick's live set is separate. Strangers hear it and see the avatar. They cannot drive those decks.
 
+AI help on the decks is paid with Percfect credits. Opening the decks and loading your own songs is free. Do not add a second payment system.
+
+
 
 Placeholder landing page for siagentdj.com.
 
