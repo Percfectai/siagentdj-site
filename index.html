@@ -545,6 +545,19 @@
       color: #fff;
       box-shadow: 0 0 6px var(--accent-red);
     }
+    .ch-reset-btn {
+      margin-top: 8px;
+      background: #1a1b22;
+      border: 1px solid var(--border-highlight);
+      color: var(--text-bright);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .ch-reset-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
     .fader-slot {
       display: flex;
@@ -666,6 +679,8 @@
   <div class="top-bar">
     <div class="brand-logo">Pioneer DJ <span>●</span> PRO SYSTEM</div>
     <div class="global-controls">
+      <button class="rec-btn" id="ai-mix-btn" type="button" style="border-color:var(--accent-cyan);color:var(--accent-cyan);background:#102226;">AI MIX</button>
+      <span id="ai-mix-status" style="font-size:11px;color:var(--text-dim);max-width:420px;">Load a track on each deck. Your songs, the ad tracks, or both. AI MIX plays them together.</span>
       <button class="rec-btn" id="master-rec-btn">● MASTER REC <span id="rec-timer">00:00</span></button>
       <a id="rec-download" style="display:none; font-size:11px; color:var(--accent-cyan);" download="Live_DJ_Mix.webm">💾 Save Mix</a>
     </div>
@@ -798,6 +813,7 @@
             <span class="knob-tag" style="color:var(--accent-orange);">COLOR</span>
             <div class="knob-ctrl" data-ch="1" data-p="color"><div class="knob-indicator"></div></div>
           </div>
+          <button class="ch-reset-btn" id="d1-reset" type="button">RESET</button>
           <div class="fader-slot">
             <input type="range" class="ch-fader" id="d1-vol" min="0" max="1" step="0.01" value="0.9">
           </div>
@@ -828,6 +844,7 @@
             <span class="knob-tag" style="color:var(--accent-orange);">COLOR</span>
             <div class="knob-ctrl" data-ch="2" data-p="color"><div class="knob-indicator"></div></div>
           </div>
+          <button class="ch-reset-btn" id="d2-reset" type="button">RESET</button>
           <div class="fader-slot">
             <input type="range" class="ch-fader" id="d2-vol" min="0" max="1" step="0.01" value="0.9">
           </div>
@@ -1017,6 +1034,11 @@
         this.cuePoint = 0;
         this.hotCues = new Array(8).fill(null);
         this.padMode = "hotcue";
+        this.keylock = true;
+        this.audio = null;
+        this.mediaNode = null;
+        this.fxSend = null;
+        this.loopBeats = 0;
 
         // Looping State
         this.isLooping = false;
@@ -1059,8 +1081,11 @@
         this.colorFilter.type = "allpass";
 
         this.deckGain = ctx.createGain();
+        this.deckGain.gain.value = parseFloat(this.dom.volFader.value);
         this.crossGain = ctx.createGain();
         this.crossGain.gain.value = 1;
+        this.fxSend = ctx.createGain();
+        this.fxSend.gain.value = 0;
 
         // Chain: EQ Low -> Mid -> High -> Color FX -> Channel Gain -> Cross Gain -> Master
         this.lowFilter.connect(this.midFilter);
@@ -1069,34 +1094,27 @@
         this.colorFilter.connect(this.deckGain);
         this.deckGain.connect(this.crossGain);
         this.crossGain.connect(masterGain);
+        this.crossGain.connect(this.fxSend);
+        this.fxSend.connect(beatFxDelay);
         if (typeof updateCrossfader === "function") updateCrossfader();
-      }
-
-      // Baby scratch. The jog already scrubs by restarting the buffer; this does the same on a clock.
-      scratch(seconds = 0.5) {
-        if (!this.buffer || this._scratching) return;
-        this._scratching = true;
-        const origin = this.getCurrentPosition();
-        const started = performance.now();
-        const step = () => {
-          const t = (performance.now() - started) / 1000;
-          if (t >= seconds) {
-            this._scratching = false;
-            this.seekTo(Math.min(this.buffer.duration - 0.05, origin + seconds * this.playbackRate));
-            return;
-          }
-          const delta = Math.sin(t * Math.PI * 10) * 0.18;
-          this.jogAngle += delta * 40;
-          if (this.dom.platter) this.dom.platter.style.transform = `rotate(${this.jogAngle}deg)`;
-          this.seekTo(Math.max(0, origin + delta));
-          requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
       }
 
       loadAudioBuffer(file) {
         const ctx = getAudioCtx();
         this.initDSP();
+        if (this.audio) {
+          this.audio.pause();
+          this.audio.src = "";
+        }
+        this.audio = new Audio();
+        this.audio.preload = "auto";
+        this.audio.preservesPitch = this.keylock;
+        this.audio.src = URL.createObjectURL(file);
+        this.mediaNode = ctx.createMediaElementSource(this.audio);
+        this.mediaNode.connect(this.lowFilter);
+        this.pauseOffset = 0;
+        this.cuePoint = 0;
+        this.isPlaying = false;
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -1104,12 +1122,9 @@
             this.buffer = buf;
             this.computePeaks();
             this.detectBPM();
-            this.pauseOffset = 0;
-            this.cuePoint = 0;
             this.dom.title.textContent = file.name.replace(/\.[^/.]+$/, "");
             this.renderOverview();
             this.updatePadVisuals();
-            if (this.onDecoded) this.onDecoded();
           });
         };
         reader.readAsArrayBuffer(file);
@@ -1167,56 +1182,40 @@
       }
 
       getCurrentPosition() {
-        if (!this.isPlaying) return this.pauseOffset;
-        const ctx = getAudioCtx();
-        const elapsed = (ctx.currentTime - this.startTime) * this.playbackRate;
-        let pos = this.pauseOffset + elapsed;
-
-        if (this.isLooping && pos >= this.loopEnd) {
-          pos = this.loopStart + (pos - this.loopEnd);
-          this.seekTo(pos);
+        if (this.audio && Number.isFinite(this.audio.currentTime)) {
+          if (this.isLooping && this.audio.currentTime >= this.loopEnd && this.loopEnd > this.loopStart) {
+            this.audio.currentTime = this.loopStart;
+          }
+          return this.audio.currentTime;
         }
-        return pos;
+        return this.pauseOffset;
       }
 
       play() {
-        if (!this.buffer) return;
+        if (!this.audio) return;
         const ctx = getAudioCtx();
-        this.initDSP();
-
-        this.sourceNode = ctx.createBufferSource();
-        this.sourceNode.buffer = this.buffer;
-        this.sourceNode.playbackRate.value = this.playbackRate;
-        this.sourceNode.connect(this.lowFilter);
-
-        const pos = this.getCurrentPosition();
-        this.startTime = ctx.currentTime;
-        this.pauseOffset = pos;
-        this.sourceNode.start(0, pos);
+        if (ctx.state === "suspended") ctx.resume();
+        this.audio.preservesPitch = this.keylock;
+        this.audio.playbackRate = this.playbackRate;
+        this.audio.play();
         this.isPlaying = true;
-
         this.dom.playBtn.classList.add("playing");
       }
 
       pause() {
-        if (!this.isPlaying) return;
-        this.pauseOffset = this.getCurrentPosition();
-        if (this.sourceNode) {
-          this.sourceNode.stop();
-          this.sourceNode.disconnect();
-          this.sourceNode = null;
-        }
+        if (!this.audio || !this.isPlaying) return;
+        this.pauseOffset = this.audio.currentTime;
+        this.audio.pause();
         this.isPlaying = false;
         this.dom.playBtn.classList.remove("playing");
       }
 
       seekTo(seconds) {
-        if (!this.buffer) return;
-        seconds = Math.max(0, Math.min(this.buffer.duration, seconds));
-        const wasPlaying = this.isPlaying;
-        if (wasPlaying) this.pause();
+        const dur = this.audio && this.audio.duration ? this.audio.duration : (this.buffer ? this.buffer.duration : 0);
+        if (!dur) return;
+        seconds = Math.max(0, Math.min(dur - 0.01, seconds));
         this.pauseOffset = seconds;
-        if (wasPlaying) this.play();
+        if (this.audio) this.audio.currentTime = seconds;
       }
 
       setLoop(numBeats) {
@@ -1224,6 +1223,7 @@
         const now = this.getCurrentPosition();
         this.loopStart = now;
         this.loopEnd = now + (numBeats * beatSecs);
+        this.loopBeats = numBeats;
         this.isLooping = true;
       }
 
@@ -1296,7 +1296,10 @@
         // Pitch Fader
         this.dom.pitch.addEventListener("input", (e) => {
           this.playbackRate = parseFloat(e.target.value);
-          if (this.sourceNode) this.sourceNode.playbackRate.value = this.playbackRate;
+          if (this.audio) {
+            this.audio.preservesPitch = this.keylock;
+            this.audio.playbackRate = this.playbackRate;
+          }
           const pct = ((this.playbackRate - 1.0) * 100).toFixed(2);
           this.dom.pitchVal.textContent = (pct >= 0 ? `+${pct}` : pct) + "%";
           this.dom.bpm.textContent = (this.detectedBpm * this.playbackRate).toFixed(1);
@@ -1310,6 +1313,13 @@
           this.dom.pitch.value = this.playbackRate;
           this.dom.pitch.dispatchEvent(new Event('input'));
           this.dom.syncBtn.classList.add("synced");
+        });
+
+        document.getElementById(`d${id}-keylock`).addEventListener("click", () => {
+          this.keylock = !this.keylock;
+          if (this.audio) this.audio.preservesPitch = this.keylock;
+          const btn = document.getElementById(`d${id}-keylock`);
+          btn.textContent = this.keylock ? "KEYLOCK [ON]" : "KEYLOCK [OFF]";
         });
 
         // Overview click-to-seek
@@ -1368,7 +1378,11 @@
         pads.forEach(pad => {
           const index = parseInt(pad.dataset.pad);
           pad.addEventListener("click", () => {
-            if (!this.buffer) return;
+            if (this.padMode === "sampler") {
+              playSynthesizedDrop(index);
+              return;
+            }
+            if (!this.audio) return;
 
             if (this.padMode === "hotcue") {
               if (this.hotCues[index] === null) {
@@ -1379,17 +1393,51 @@
               }
             } else if (this.padMode === "loop") {
               const loopSizes = [0.25, 0.5, 1, 2, 4, 8, 16, 32];
-              this.setLoop(loopSizes[index]);
+              if (this.isLooping && this.loopBeats === loopSizes[index]) this.isLooping = false;
+              else this.setLoop(loopSizes[index]);
             } else if (this.padMode === "fx") {
-              // Quick Beat Rolls & Filters
-              this.colorFilter.type = "bandpass";
-              this.colorFilter.frequency.value = 400 + index * 400;
-              setTimeout(() => { this.colorFilter.type = "allpass"; }, 400);
-            } else if (this.padMode === "sampler") {
-              playSynthesizedDrop(index);
+              this.triggerPadFx(index);
             }
           });
         });
+      }
+
+      triggerPadFx(index) {
+        if (!this.colorFilter) return;
+        if (index === 0 || index === 1) {
+          this.setLoop(index === 0 ? 0.25 : 0.5);
+          setTimeout(() => { this.isLooping = false; }, 700);
+          return;
+        }
+        if (index === 2) {
+          this.colorFilter.type = "lowpass";
+          this.colorFilter.frequency.value = 600;
+        } else if (index === 3) {
+          this.colorFilter.type = "highpass";
+          this.colorFilter.frequency.value = 1800;
+        } else if (index === 4) {
+          this.deckGain.gain.value = 0;
+          setTimeout(() => { this.deckGain.gain.value = parseFloat(this.dom.volFader.value); }, 90);
+          setTimeout(() => { this.deckGain.gain.value = 0; }, 180);
+          setTimeout(() => { this.deckGain.gain.value = parseFloat(this.dom.volFader.value); }, 270);
+          return;
+        } else if (index === 5 || index === 6) {
+          document.getElementById("fx-type").value = index === 5 ? "echo" : "flanger";
+          document.getElementById("fx-target").value = String(this.id);
+          if (typeof applyBeatFx === "function") applyBeatFx(true);
+          setTimeout(() => { if (typeof applyBeatFx === "function") applyBeatFx(false); }, 900);
+          return;
+        } else if (index === 7) {
+          const start = this.playbackRate;
+          this.playbackRate = 0.4;
+          if (this.audio) this.audio.playbackRate = 0.4;
+          setTimeout(() => {
+            this.playbackRate = start;
+            if (this.audio) this.audio.playbackRate = start;
+          }, 500);
+          return;
+        }
+        setTimeout(() => { this.colorFilter.type = "allpass"; }, 500);
       }
 
       updatePadVisuals() {
@@ -1552,7 +1600,7 @@
        ========================================================================== */
     // Rotary EQ & Color FX Drag
     document.querySelectorAll(".knob-ctrl").forEach(knob => {
-      let val = 0; // -1 to +1
+      knob._mix = 0;
       let startY = 0;
 
       knob.addEventListener("mousedown", (e) => {
@@ -1562,7 +1610,8 @@
 
         const onMove = (ev) => {
           const dy = startY - ev.clientY;
-          val = Math.max(-1, Math.min(1, val + dy * 0.015));
+          knob._mix = Math.max(-1, Math.min(1, knob._mix + dy * 0.015));
+          const val = knob._mix;
           knob.style.transform = `rotate(${val * 135}deg)`;
 
           if (ch.lowFilter) {
@@ -1594,7 +1643,7 @@
       });
 
       knob.addEventListener("dblclick", () => {
-        val = 0;
+        knob._mix = 0;
         knob.style.transform = `rotate(0deg)`;
         const ch = knob.dataset.ch === "1" ? deck1 : deck2;
         if (ch.lowFilter) {
@@ -1602,6 +1651,7 @@
           ch.midFilter.gain.value = 0;
           ch.lowFilter.gain.value = 0;
           ch.colorFilter.type = "allpass";
+          if (ch.deckGain) ch.deckGain.gain.value = parseFloat(ch.dom.volFader.value);
         }
       });
     });
@@ -1621,6 +1671,30 @@
         }
       });
     });
+
+    function resetChannel(id) {
+      const deck = id === 1 ? deck1 : deck2;
+      document.querySelectorAll(`.knob-ctrl[data-ch="${id}"]`).forEach((knob) => {
+        knob._mix = 0;
+        knob.style.transform = "rotate(0deg)";
+      });
+      document.querySelectorAll(`.eq-kill-btn[data-ch="${id}"]`).forEach((btn) => {
+        btn.classList.remove("killed");
+      });
+      const fader = document.getElementById(`d${id}-vol`);
+      fader.value = "0.9";
+      if (deck.highFilter) deck.highFilter.gain.value = 0;
+      if (deck.midFilter) deck.midFilter.gain.value = 0;
+      if (deck.lowFilter) deck.lowFilter.gain.value = 0;
+      if (deck.colorFilter) {
+        deck.colorFilter.type = "allpass";
+        deck.colorFilter.frequency.value = 20;
+      }
+      if (deck.deckGain) deck.deckGain.gain.value = 0.9;
+      if (deck.fxSend) deck.fxSend.gain.value = 0;
+    }
+    document.getElementById("d1-reset").addEventListener("click", () => resetChannel(1));
+    document.getElementById("d2-reset").addEventListener("click", () => resetChannel(2));
 
     // Volume Faders
     deck1.dom.volFader.addEventListener("input", (e) => {
@@ -1651,20 +1725,45 @@
       if (deck1.crossGain) deck1.crossGain.gain.value = g1;
       if (deck2.crossGain) deck2.crossGain.gain.value = g2;
     }
-    function setCrossfade(x) {
-      xfader.value = String(Math.max(0, Math.min(1, x)));
-      updateCrossfader();
-    }
     xfader.addEventListener("input", updateCrossfader);
     document.querySelectorAll('input[name="curve"]').forEach(r => r.addEventListener("change", updateCrossfader));
 
-    // Beat FX Engine Rack
+    // Beat FX Engine Rack. The delay only sounds if a deck send is feeding it.
+    function applyBeatFx(force) {
+      if (typeof force === "boolean") fxActive = force;
+      const fxBtn = document.getElementById("fx-toggle");
+      fxBtn.classList.toggle("active", fxActive);
+      fxBtn.textContent = fxActive ? "FX OFF" : "FX ON";
+      const type = document.getElementById("fx-type").value;
+      const target = document.getElementById("fx-target").value;
+      const beat = 60 / ((deck1.detectedBpm || 128) * deck1.playbackRate);
+      if (type === "echo") {
+        beatFxDelay.delayTime.value = beat * 0.75;
+        beatFxFeedback.gain.value = 0.45;
+      } else if (type === "flanger") {
+        beatFxDelay.delayTime.value = 0.007;
+        beatFxFeedback.gain.value = 0.65;
+      } else if (type === "reverb") {
+        beatFxDelay.delayTime.value = 0.11;
+        beatFxFeedback.gain.value = 0.5;
+      } else {
+        beatFxDelay.delayTime.value = beat * 0.25;
+        beatFxFeedback.gain.value = 0.82;
+      }
+      beatFxWet.gain.value = fxActive ? 0.55 : 0;
+      [deck1, deck2].forEach((deck) => {
+        if (!deck.fxSend) return;
+        const open = fxActive && (target === "master" || target === String(deck.id));
+        deck.fxSend.gain.value = open ? 1 : 0;
+      });
+    }
     const fxBtn = document.getElementById("fx-toggle");
     fxBtn.addEventListener("click", () => {
       fxActive = !fxActive;
-      fxBtn.classList.toggle("active", fxActive);
-      beatFxWet.gain.value = fxActive ? 0.6 : 0.0;
+      applyBeatFx();
     });
+    document.getElementById("fx-type").addEventListener("change", () => { if (fxActive) applyBeatFx(); });
+    document.getElementById("fx-target").addEventListener("change", () => { if (fxActive) applyBeatFx(); });
 
     /* ==========================================================================
        MASTER LIVE RECORDER (Lossless Stream MediaRecorder API)
@@ -1771,8 +1870,40 @@
     /* ==========================================================================
        KEYBOARD HOTKEYS (Pro DJ Fast Mapping)
        ========================================================================== */
+    document.getElementById("ai-mix-btn").addEventListener("click", () => {
+      const status = document.getElementById("ai-mix-status");
+      if (!deck1.audio || !deck2.audio) {
+        status.textContent = "Load a track on Player 1 and Player 2 first.";
+        return;
+      }
+      getAudioCtx().resume();
+      document.getElementById("d2-sync").click();
+      ["d1-vol", "d2-vol"].forEach((id) => {
+        const fader = document.getElementById(id);
+        if (parseFloat(fader.value) < 0.5) fader.value = "0.9";
+        fader.dispatchEvent(new Event("input"));
+      });
+      const xf = document.getElementById("crossfader");
+      xf.value = "0.5";
+      xf.dispatchEvent(new Event("input"));
+      deck1.crossGain.gain.value = 1;
+      deck2.crossGain.gain.value = 1;
+      const low2 = document.querySelector('.eq-kill-btn[data-ch="2"][data-eq="low"]');
+      if (low2 && !low2.classList.contains("killed")) low2.click();
+      if (!deck1.isPlaying) deck1.play();
+      if (!deck2.isPlaying) deck2.play();
+      const bpm = parseFloat(document.getElementById("d1-bpm").textContent) || 128;
+      status.textContent = "Both decks live. Player 2 bass is out until the next 32 beats.";
+      setTimeout(() => {
+        const low1 = document.querySelector('.eq-kill-btn[data-ch="1"][data-eq="low"]');
+        if (low1 && !low1.classList.contains("killed")) low1.click();
+        if (low2 && low2.classList.contains("killed")) low2.click();
+        status.textContent = "Phrase swap. Player 1 bass out, Player 2 bass in. Both still playing.";
+      }, (60 / bpm) * 32 * 1000);
+    });
+
     window.addEventListener("keydown", (e) => {
-      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.target.tagName === 'INPUT') return;
       if (e.code === "Space") { e.preventDefault(); deck1.dom.playBtn.click(); }
       if (e.code === "KeyD") deck2.dom.playBtn.click();
       if (e.code === "KeyQ") deck1.dom.cueBtn.dispatchEvent(new Event('mousedown'));
@@ -1781,7 +1912,6 @@
       if (e.code === "ArrowRight") xfader.value = Math.min(1, parseFloat(xfader.value) + 0.1);
       updateCrossfader();
     });
-
-</script>
+  </script>
 </body>
 </html>
